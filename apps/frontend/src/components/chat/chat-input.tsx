@@ -3,20 +3,22 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useMessages } from "@/store/messages";
 import { usePrompts } from "@/store/prompts";
 import { PromptDialog } from "./prompt-dialog";
 import type { Message } from "@/types/chat";
 
 interface ChatInputProps {
   onTypingChange: (isTyping: boolean) => void;
+  onSendMessage: (content: string, file?: Message["file"]) => Promise<void>;
 }
 
-export const ChatInput = ({ onTypingChange }: ChatInputProps) => {
+export const ChatInput = ({
+  onTypingChange,
+  onSendMessage,
+}: ChatInputProps) => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [file, setFile] = useState<Message["file"] | null>(null);
-  const { messages, addMessage, updateLastMessage } = useMessages();
   const { prompts } = usePrompts();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,69 +83,11 @@ export const ChatInput = ({ onTypingChange }: ChatInputProps) => {
       textareaRef.current.style.height = "48px";
     }
 
-    // Add user message
-    addMessage({
-      role: "user",
-      content: input,
-      file: file || undefined,
-    });
-
-    // Add empty assistant message that will be streamed
-    addMessage({
-      role: "assistant",
-      content: "",
-    });
-
-    setInput("");
-    setFile(null);
     setIsLoading(true);
-
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: [
-            ...messages,
-            { role: "user", content: input, file: file || undefined },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to get response");
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No reader available");
-
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                updateLastMessage(data.content);
-              }
-            } catch (e) {
-              console.error("Error parsing SSE data:", e);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      updateLastMessage("Sorry, there was an error processing your request.");
+      await onSendMessage(input, file || undefined);
+      setInput("");
+      setFile(null);
     } finally {
       setIsLoading(false);
     }
