@@ -52,7 +52,7 @@ cp .env.example .env
 
 ```bash
 # Navigate to the backend directory
-cd apps/backend
+cd apps/frontend
 
 # Create a .env file
 cp .env.example .env
