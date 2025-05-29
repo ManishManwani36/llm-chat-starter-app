@@ -32,6 +32,13 @@ app.post(
         z.object({
           role: z.enum(["user", "assistant"]),
           content: z.string(),
+          file: z
+            .object({
+              name: z.string(),
+              type: z.string(),
+              data: z.string(),
+            })
+            .optional(),
         })
       ),
     })
@@ -44,9 +51,20 @@ app.post(
         return c.json({ error: "Messages are required" }, 400);
       }
 
+      // Process messages to include file data in the content if present
+      const processedMessages = messages.map((msg) => {
+        if (msg.file) {
+          return {
+            ...msg,
+            content: `${msg.content}\n\nFile: ${msg.file.name} (${msg.file.type})\nData: ${msg.file.data}`,
+          };
+        }
+        return msg;
+      });
+
       const aiStream = await openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages,
+        messages: processedMessages,
         temperature: 0.7,
         stream: true,
       });
@@ -67,4 +85,3 @@ app.post(
     }
   }
 );
-
